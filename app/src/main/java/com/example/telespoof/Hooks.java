@@ -154,12 +154,14 @@ final class Hooks {
                 ctor.setAccessible(true);
                 Object id = ctor.newInstance(
                         Integer.parseInt(c.mcc), Integer.parseInt(c.mnc), c.cid, c.pci, c.tac);
-                CellInfoLte info = new CellInfoLte();
+                Constructor<?> cellCtor = CellInfoLte.class.getDeclaredConstructor();
+                cellCtor.setAccessible(true);
+                Object cell = cellCtor.newInstance();
                 Method set = CellInfoLte.class.getMethod("setCellIdentity", CellIdentityLte.class);
                 set.setAccessible(true);
-                set.invoke(info, id);
+                set.invoke(cell, id);
                 List<CellInfo> out = new ArrayList<>();
-                out.add(info);
+                out.add((CellInfo) cell);
                 return out;
             }
         } catch (Throwable ignored) {
