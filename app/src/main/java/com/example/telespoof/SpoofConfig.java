@@ -21,6 +21,11 @@ public final class SpoofConfig {
     public String ssid = "HomeNet";
     public String bssid = "00:11:22:33:44:55";
 
+    /** 基站 hook 默认关闭：目前没有可靠的基站数据，开启只会隐藏真实值。 */
+    public boolean cellEnabled = false;
+    /** Wi-Fi hook 默认关闭：同上。 */
+    public boolean wifiEnabled = false;
+
     private static volatile SpoofConfig cached;
     private static volatile long cachedAt;
 
@@ -54,6 +59,8 @@ public final class SpoofConfig {
             c.tac = parseInt(p.getString("tac", String.valueOf(c.tac)), c.tac);
             c.ssid = p.getString("ssid", c.ssid);
             c.bssid = p.getString("bssid", c.bssid);
+            c.cellEnabled = "1".equals(p.getString("cell_enabled", "0"));
+            c.wifiEnabled = "1".equals(p.getString("wifi_enabled", "0"));
         } catch (Throwable ignored) {
         }
         return c;
@@ -95,6 +102,8 @@ public final class SpoofConfig {
                 .putString("tac", String.valueOf(c.tac))
                 .putString("ssid", c.ssid)
                 .putString("bssid", c.bssid)
+                .putString("cell_enabled", c.cellEnabled ? "1" : "0")
+                .putString("wifi_enabled", c.wifiEnabled ? "1" : "0")
                 .apply();
     }
 }
