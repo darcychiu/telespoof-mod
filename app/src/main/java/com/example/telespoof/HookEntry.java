@@ -17,6 +17,7 @@ public class HookEntry implements IXposedHookLoadPackage {
             return;
         }
         try {
+            XposedBridge.log("TeleSpoof: active in " + lpparam.packageName);
             Hooks.install(lpparam.classLoader);
         } catch (Throwable t) {
             XposedBridge.log("TeleSpoof: install failed in " + lpparam.packageName + ": " + t);
