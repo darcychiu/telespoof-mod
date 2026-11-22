@@ -7,6 +7,7 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -16,6 +17,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
 
     private EditText mcc, mnc, iso, alpha, lac, cid, pci, tac, ssid, bssid;
+    private CheckBox cellEnabled, wifiEnabled;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,6 +53,16 @@ public class MainActivity extends Activity {
         ssid = addField(root, "Wi-Fi SSID", p.getString("ssid", "HomeNet"));
         bssid = addField(root, "Wi-Fi BSSID", p.getString("bssid", "00:11:22:33:44:55"));
 
+        cellEnabled = new CheckBox(this);
+        cellEnabled.setText("启用基站 hook（getAllCellInfo / getCellLocation）");
+        cellEnabled.setChecked("1".equals(p.getString("cell_enabled", "0")));
+        root.addView(cellEnabled);
+
+        wifiEnabled = new CheckBox(this);
+        wifiEnabled.setText("启用 Wi-Fi hook（扫描结果 / SSID / BSSID）");
+        wifiEnabled.setChecked("1".equals(p.getString("wifi_enabled", "0")));
+        root.addView(wifiEnabled);
+
         Button save = new Button(this);
         save.setText("保存");
         save.setOnClickListener(v -> {
@@ -64,6 +76,8 @@ public class MainActivity extends Activity {
             c.tac = parseInt(tac.getText().toString(), 1234);
             c.ssid = ssid.getText().toString().trim();
             c.bssid = bssid.getText().toString().trim();
+            c.cellEnabled = cellEnabled.isChecked();
+            c.wifiEnabled = wifiEnabled.isChecked();
             SpoofConfig.save(p, c);
             Toast.makeText(this, "已保存，强制停止目标 App 后重新打开", Toast.LENGTH_LONG).show();
         });
