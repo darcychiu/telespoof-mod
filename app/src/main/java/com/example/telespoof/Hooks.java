@@ -26,8 +26,13 @@ final class Hooks {
 
     static void install(ClassLoader cl) {
         hookTelephonyScalars(cl);
-        hookCells(cl);
-        hookWifi(cl);
+        SpoofConfig c = SpoofConfig.get();
+        if (c.cellEnabled) {
+            hookCells(cl);
+        }
+        if (c.wifiEnabled) {
+            hookWifi(cl);
+        }
     }
 
     private static void hookTelephonyScalars(ClassLoader cl) {
