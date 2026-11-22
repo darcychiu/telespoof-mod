@@ -22,9 +22,16 @@ jobs:
           gradle-version: '8.9'
 
       - name: Build debug APK
-        run: gradle assembleDebug --no-daemon
+        run: gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "::error::gradle build failed, tail follows"
+          tail -n 30 build.log | sed 's/^/::error::/'
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: TeleSpoof-debug
