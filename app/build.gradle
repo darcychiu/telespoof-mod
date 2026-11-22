@@ -1,0 +1,32 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.example.telespoof'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.example.telespoof"
+        minSdk 29
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // 已内置 app/libs/api-82.jar，运行时由 LSPosed 提供实现。
+    compileOnly files('libs/api-82.jar')
+}
