@@ -3,13 +3,9 @@ package com.example.telespoof;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
-import android.telephony.CellIdentityLte;
 import android.telephony.CellInfo;
-import android.telephony.CellInfoLte;
 import android.telephony.TelephonyManager;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -21,6 +17,7 @@ import de.robv.android.xposed.XposedHelpers;
 
 /**
  * 所有 hook 都只作用于 LSPosed 里勾选的作用域进程。
+ * 原则：返回值类型必须与目标方法一致，且不返回半初始化对象，避免目标 App NPE。
  */
 final class Hooks {
 
@@ -39,37 +36,61 @@ final class Hooks {
         hook(cl, tm, "getSimOperator", new XC_MethodReplacement() {
             @Override
             protected Object replaceHookedMethod(MethodHookParam param) {
-                return SpoofConfig.get().simOperator();
+                try {
+                    return SpoofConfig.get().simOperator();
+                } catch (Throwable t) {
+                    return "310260";
+                }
             }
         });
         hook(cl, tm, "getNetworkOperator", new XC_MethodReplacement() {
             @Override
             protected Object replaceHookedMethod(MethodHookParam param) {
-                return SpoofConfig.get().networkOperator();
+                try {
+                    return SpoofConfig.get().networkOperator();
+                } catch (Throwable t) {
+                    return "310260";
+                }
             }
         });
         hook(cl, tm, "getSimOperatorName", new XC_MethodReplacement() {
             @Override
             protected Object replaceHookedMethod(MethodHookParam param) {
-                return SpoofConfig.get().alpha;
+                try {
+                    return SpoofConfig.get().alpha;
+                } catch (Throwable t) {
+                    return "T-Mobile";
+                }
             }
         });
         hook(cl, tm, "getNetworkOperatorName", new XC_MethodReplacement() {
             @Override
             protected Object replaceHookedMethod(MethodHookParam param) {
-                return SpoofConfig.get().alpha;
+                try {
+                    return SpoofConfig.get().alpha;
+                } catch (Throwable t) {
+                    return "T-Mobile";
+                }
             }
         });
         hook(cl, tm, "getSimCountryIso", new XC_MethodReplacement() {
             @Override
             protected Object replaceHookedMethod(MethodHookParam param) {
-                return SpoofConfig.get().iso;
+                try {
+                    return SpoofConfig.get().iso;
+                } catch (Throwable t) {
+                    return "us";
+                }
             }
         });
         hook(cl, tm, "getNetworkCountryIso", new XC_MethodReplacement() {
             @Override
             protected Object replaceHookedMethod(MethodHookParam param) {
-                return SpoofConfig.get().iso;
+                try {
+                    return SpoofConfig.get().iso;
+                } catch (Throwable t) {
+                    return "us";
+                }
             }
         });
         hook(cl, tm, "getSimState", new XC_MethodReplacement() {
@@ -111,12 +132,18 @@ final class Hooks {
     }
 
     private static void hookCells(ClassLoader cl) {
+        // 只“隐藏”，不伪造 CellInfoLte 对象：反射构造的半成品对象会让读取
+        // getCellSignalStrength()/getCellIdentity() 的 App 直接 NPE（DevCheck 闪退就是这个原因）。
         try {
             XposedHelpers.findAndHookMethod("android.telephony.TelephonyManager", cl,
                     "getAllCellInfo", new XC_MethodHook() {
                         @Override
                         protected void afterHookedMethod(MethodHookParam param) {
-                            param.setResult(fakeCells());
+                            try {
+                                param.setResult(Collections.emptyList());
+                            } catch (Throwable t) {
+                                XposedBridge.log("TeleSpoof: getAllCellInfo hook failed: " + t);
+                            }
                         }
                     });
         } catch (Throwable t) {
@@ -128,7 +155,6 @@ final class Hooks {
                     "getCellLocation", new XC_MethodReplacement() {
                         @Override
                         protected Object replaceHookedMethod(MethodHookParam param) {
-                            // 隐藏真实基站；返回 null 比返回中国基站安全。
                             return null;
                         }
                     });
@@ -137,41 +163,7 @@ final class Hooks {
         }
     }
 
-    private static List<CellInfo> fakeCells() {
-        SpoofConfig c = SpoofConfig.get();
-        try {
-            Constructor<?> ctor = null;
-            for (Constructor<?> k : CellIdentityLte.class.getDeclaredConstructors()) {
-                Class<?>[] p = k.getParameterTypes();
-                if (p.length == 5
-                        && p[0] == int.class && p[1] == int.class && p[2] == int.class
-                        && p[3] == int.class && p[4] == int.class) {
-                    ctor = k;
-                    break;
-                }
-            }
-            if (ctor != null) {
-                ctor.setAccessible(true);
-                Object id = ctor.newInstance(
-                        Integer.parseInt(c.mcc), Integer.parseInt(c.mnc), c.cid, c.pci, c.tac);
-                Constructor<?> cellCtor = CellInfoLte.class.getDeclaredConstructor();
-                cellCtor.setAccessible(true);
-                Object cell = cellCtor.newInstance();
-                Method set = CellInfoLte.class.getMethod("setCellIdentity", CellIdentityLte.class);
-                set.setAccessible(true);
-                set.invoke(cell, id);
-                List<CellInfo> out = new ArrayList<>();
-                out.add((CellInfo) cell);
-                return out;
-            }
-        } catch (Throwable ignored) {
-        }
-        // 兜底：返回空列表，至少不把真实的中国基站暴露出去。
-        return Collections.emptyList();
-    }
-
     private static void hookWifi(ClassLoader cl) {
-        // Wi-Fi 扫描结果：直接清空，避免暴露周围中国热点。
         try {
             XposedHelpers.findAndHookMethod(WifiManager.class, "getScanResults",
                     new XC_MethodReplacement() {
@@ -184,13 +176,16 @@ final class Hooks {
             XposedBridge.log("TeleSpoof: hook getScanResults failed: " + t);
         }
 
-        // 当前连接信息：只改 SSID / BSSID，其余字段保留真实对象，避免 NPE。
         try {
             XposedHelpers.findAndHookMethod(WifiInfo.class, "getSSID",
                     new XC_MethodReplacement() {
                         @Override
                         protected Object replaceHookedMethod(MethodHookParam param) {
-                            return SpoofConfig.get().quotedSsid();
+                            try {
+                                return SpoofConfig.get().quotedSsid();
+                            } catch (Throwable t) {
+                                return "\"HomeNet\"";
+                            }
                         }
                     });
         } catch (Throwable t) {
@@ -202,7 +197,11 @@ final class Hooks {
                     new XC_MethodReplacement() {
                         @Override
                         protected Object replaceHookedMethod(MethodHookParam param) {
-                            return SpoofConfig.get().bssid;
+                            try {
+                                return SpoofConfig.get().bssid;
+                            } catch (Throwable t) {
+                                return "00:11:22:33:44:55";
+                            }
                         }
                     });
         } catch (Throwable t) {
