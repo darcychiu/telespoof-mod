@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -36,10 +39,19 @@ jobs:
           sed -n '/What went wrong/,/^\* Try/p' build.log | head -n 25 | sed 's/^/::error::/'
           grep -nE "^e: |error:|FAILURE: |Execution failed for task" build.log | head -n 15 | sed 's/^/::error::/'
 
-      - name: Upload APK
+      - name: Upload artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: TeleSpoof-debug
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      - name: Publish release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: TeleSpoof build ${{ github.run_number }}
+          files: app/build/outputs/apk/debug/app-debug.apk
+          fail_on_unmatched_files: true
